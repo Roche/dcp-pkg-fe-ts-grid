@@ -1,6 +1,6 @@
 {
   "name": "@open-dcp/grid",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,8 +17,8 @@
     "rxjs": ">=7.8.2"
   },
   "dependencies": {
-    "@open-dcp/filter": ">=0.1.5",
-    "@open-dcp/utilities": ">=1.1.0",
+    "@open-dcp/filter": ">=0.1.6",
+    "@open-dcp/utilities": ">=1.1.1",
     "@types/lodash-es": ">=4.17.12",
     "date-fns": ">=4.1.0",
     "date-fns-tz": ">=3.2.0",
