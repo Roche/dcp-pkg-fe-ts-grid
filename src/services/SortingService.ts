@@ -1,11 +1,16 @@
-import type { GridService } from "../GridService";
-import type { Row } from "../types/grid";
-import { SortingCondition } from '../types/sorting';
+import type { GridService } from "../GridService.js";
+import type { Row } from "../types/grid.js";
+import { SortingCondition } from '../types/sorting.js';
 
 export class SortingService {
     private readonly gridService: GridService;
     private readonly sortConditions: SortingCondition[];
-    private sortedIndexes: number[] | null = null;
+    /**
+     * Sorted positions (within the filtered rows) plus the inputs they were computed from. The cache is
+     * only reused for the same source rows and the same filter result, so new data or a changed
+     * filter/search always re-sorts (previously keyed on the row count only).
+     */
+    private cache: { rows: Row[]; filterIndexes: number[] | null; sortedIndexes: number[] } | null = null;
 
     constructor(gridService: GridService, sortConditions: SortingCondition[] = []) {
         this.gridService = gridService;
@@ -37,22 +42,43 @@ export class SortingService {
             }
         }
 
-        this.sortedIndexes = null;
+        this.cache = null;
     }
 
-    applySorting(rows: Row[]): Row[] {    
+    /**
+     * Sorts the (already filtered) rows and rebuilds the grid's index mapping view position → original
+     * row index on every call, also when the cached order is reused or no sort is active.
+     */
+    applySorting(rows: Row[]): Row[] {
+        const filterIndexes = this.gridService.getFilterIndexes();
+        const toOriginalIndex = (position: number) => filterIndexes ? filterIndexes[position] : position;
+
         if (this.sortConditions.length === 0) {
+            this.cache = null;
+            this.gridService.setIndexMapping(new Map(rows.map((_, i) => [i, toOriginalIndex(i)])));
             return rows;
         }
 
+        const sourceRows = this.gridService.getRows();
         if (
-            this.sortedIndexes &&
-            this.sortedIndexes.length === rows.length &&
-            this.sortedIndexes.every(index => index >= 0 && index < rows.length)
+            !this.cache ||
+            this.cache.rows !== sourceRows ||
+            this.cache.filterIndexes !== filterIndexes ||
+            this.cache.sortedIndexes.length !== rows.length
         ) {
-            return this.sortedIndexes.map(index => rows[index]); // Apply cached order
+            this.cache = {
+                rows: sourceRows,
+                filterIndexes,
+                sortedIndexes: this.computeSortedIndexes(rows)
+            };
         }
 
+        const sortedIndexes = this.cache.sortedIndexes;
+        this.gridService.setIndexMapping(new Map(sortedIndexes.map((position, i) => [i, toOriginalIndex(position)])));
+        return sortedIndexes.map(position => rows[position]);
+    }
+
+    private computeSortedIndexes(rows: Row[]): number[] {
         const indexedRows = rows.map((row, index) => ({ row, index }));
 
         indexedRows.sort((a, b) => {
@@ -84,22 +110,14 @@ export class SortingService {
             return 0; // Keep stable sorting
         });
 
-        const filteredIndexes = this.gridService.getFilterIndexes() ?? this.gridService.getRows().map((_, i) => i);;
-        
-        this.gridService.clearIndexMap(); // Clear the existing mapping
-        indexedRows.forEach((indexedRow, i) => {
-            this.gridService.setIndexMappingValue(i, filteredIndexes[indexedRow.index]); // Map the sorted index to the original index
-        });
-
-        this.sortedIndexes = indexedRows.map(item => item.index);
-        return indexedRows.map(item => item.row); // Return sorted rows
+        return indexedRows.map(item => item.index);
     }
 
     getSortedIndexes(): number[] | null {
-        return this.sortedIndexes;
+        return this.cache?.sortedIndexes ?? null;
     }
 
     resetSorting() {
-        this.sortedIndexes = null;
+        this.cache = null;
     }
 }

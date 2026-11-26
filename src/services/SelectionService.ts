@@ -52,16 +52,12 @@ export class SelectionService {
         this.clearSelection();
     }
 
-    shiftSelect(startIndex: number, endIndex: number) {
+    /** Adds the given indexes to the selection (multi-select only). */
+    addToSelection(indices: number[]) {
         if (!this.multiSelect) return;
 
         const selected = new Set(this.selectedIndexes$.value);
-        const [start, end] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
-
-        for (let i = start; i <= end; i++) {
-            selected.add(i);
-        }
-
+        indices.forEach(index => selected.add(index));
         this.selectedIndexes$.next(selected);
     }
 

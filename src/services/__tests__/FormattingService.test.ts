@@ -1,6 +1,6 @@
-import { FormattingService } from '../FormattingService';
-import { GridService } from '../../GridService';
-import { Column, Row } from '../../types/grid';
+import { FormattingService } from '../FormattingService.js';
+import { GridService } from '../../GridService.js';
+import { Column, Row } from '../../types/grid.js';
 
 describe('FormattingService', () => {
     let gridService: GridService;

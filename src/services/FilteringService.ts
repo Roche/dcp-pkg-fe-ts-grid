@@ -1,6 +1,6 @@
 import { BehaviorSubject } from "rxjs";
-import type { GridService } from "../GridService";
-import type { CellValue, Column, GlobalSearchMode, GlobalSearchOptions, GlobalSearchState, Row } from "../types/grid";
+import type { GridService } from "../GridService.js";
+import type { CellValue, Column, GlobalSearchMode, GlobalSearchOptions, GlobalSearchState, Row } from "../types/grid.js";
 import { FilterCondition, FilterNode, evaluateFilterTree } from "@open-dcp/filter";
 import { logger } from '@open-dcp/utilities';
 

@@ -1,6 +1,6 @@
-import { FilteringService } from '../FilteringService';
-import { GridService } from '../../GridService';
-import { Column, Row } from '../../types/grid';
+import { FilteringService } from '../FilteringService.js';
+import { GridService } from '../../GridService.js';
+import { Column, Row } from '../../types/grid.js';
 import { FilterNode } from '@open-dcp/filter';
 
 describe('FilteringService', () => {

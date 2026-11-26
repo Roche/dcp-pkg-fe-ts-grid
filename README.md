@@ -18,9 +18,10 @@ DCP modules and client libraries are published across official package registrie
 * **npm:** [@open-dcp](https://www.npmjs.com/org/open-dcp)
 * **Packagist:** [open-dcp](https://packagist.org/packages/open-dcp/)
 * **NuGet:** [OpenDCP](https://www.nuget.org/packages?q=OpenDCP)
+* **Container Images:** [GitHub Container Registry](https://github.com/orgs/Roche/packages?tab=packages&q=dcp-)
 * **Documentation & Guides:** [docs.open-dcp.ai](https://docs.open-dcp.ai)
 
-*Upcoming Registries:* CRAN (R), Container Images
+*Upcoming Registries:* CRAN (R)
 
 ## Learning DCP
 

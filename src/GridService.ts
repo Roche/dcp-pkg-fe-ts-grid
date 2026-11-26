@@ -12,16 +12,16 @@ import {
     FilterSortUpdatePayload,
     GlobalSearchOptions,
     GlobalSearchState,
-} from './types/grid';
+} from './types/grid.js';
 import { FilterNode } from '@open-dcp/filter';
 import { logger } from '@open-dcp/utilities';
-import { SortingCondition, ApiModeConfig } from './types/sorting';
+import { SortingCondition, ApiModeConfig } from './types/sorting.js';
 
-import { RowHeightService } from './services/RowHeightService';
-import { SortingService } from './services/SortingService';
-import { FormattingService } from './services/FormattingService';
-import { FilteringService } from './services/FilteringService';
-import { SelectionService } from './services/SelectionService';
+import { RowHeightService } from './services/RowHeightService.js';
+import { SortingService } from './services/SortingService.js';
+import { FormattingService } from './services/FormattingService.js';
+import { FilteringService } from './services/FilteringService.js';
+import { SelectionService } from './services/SelectionService.js';
 
 const DEFAULT_DISPLAY_FORMAT: Required<DisplayFormat> = {
     timeZone: "UTC",
@@ -114,14 +114,18 @@ export class GridService {
             renderRows: []
         });
 
+        // Reference check only: every setRows() call produces a new (formatted) array, i.e. new data.
+        // A deep isEqual over all rows here cost ~150 ms per update at 10k rows x 20 columns.
         this.rows$.pipe(
             skip(1),
-            distinctUntilChanged((prev, curr) => isEqual(curr, prev))
+            distinctUntilChanged()
         ).subscribe(() => {
             if (this.apiMode) {
                 return;
             }
 
+            // Filter indexes must match the new rows before rendering (otherwise stale rows are shown)
+            this.filteringService.updateFilterIndexesForUpdatedData();
             this.updateRenderedRows()
             this.rowHeightService.initRowHeights(this.rowCount())
         });
@@ -186,11 +190,16 @@ export class GridService {
         // Format the rows first!
         const formattedRows = rows.map(row => this.formattingService.applyFormattingToRow(row));
 
+        // Reset index mapping - it will be recalculated based on client-side operations
+        this.indexMapping = this.createIdentityMapping(formattedRows.length);
+        this.sortingService.resetSorting();
+
         // Set the formatted rows
         this.rowsSubject.next(formattedRows);
 
-        // Reset index mapping - it will be recalculated based on client-side operations
-        this.indexMapping = new Map([...Array(formattedRows.length).keys()].map(i => [i, i]));
+        if (this.clientSideFilter) {
+            this.filteringService.updateFilterIndexesForUpdatedData();
+        }
 
         this.rowHeightService.initRowHeights(formattedRows.length);
         this.updateRenderedRows();
@@ -329,11 +338,15 @@ export class GridService {
             ? rows.map(row => this.formattingService.applyFormattingToRow(row))
             : rows;
 
-        this.indexMapping = new Map([...Array(rows.length).keys()].map(i => [i, i]))
+        this.indexMapping = this.createIdentityMapping(updatedRows.length);
+        this.sortingService.resetSorting();
 
+        // Outside API mode the rows$ subscriber refreshes the filter indexes and renders.
         this.rowsSubject.next(updatedRows);
 
-        this.filteringService.updateFilterIndexesForUpdatedData();
+        if (this.apiMode) {
+            this.filteringService.updateFilterIndexesForUpdatedData();
+        }
     }
 
     getColumns() {
@@ -418,14 +431,26 @@ export class GridService {
         this.selectionService.toggleRowSelection(index);
     }
 
+    /** Selects all rows of the current view (after filter/search), by original row index. */
     selectAll() {
-        const rowsOfInterest = this.getRowsOfInterest();
-        const indices = rowsOfInterest.map((_, i) => i);
-        this.selectionService.selectAll(indices);
+        this.selectionService.selectAll(this.getViewOriginalIndexes());
     }
 
+    /**
+     * Selects the range of rows between two rows as they appear in the current (filtered/sorted) view.
+     * Both arguments are original row indexes (`globaIndex`), like `toggleRowSelection`. Rows that are not
+     * in the view are ignored; the existing selection is kept.
+     */
     shiftSelect(startIndex: number, endIndex: number) {
-        this.selectionService.shiftSelect(startIndex, endIndex);
+        const view = this.getViewOriginalIndexes();
+        const positions = [view.indexOf(startIndex), view.indexOf(endIndex)].filter(position => position !== -1);
+        if (positions.length === 0) {
+            return;
+        }
+
+        const from = Math.min(...positions);
+        const to = Math.max(...positions);
+        this.selectionService.addToSelection(view.slice(from, to + 1));
     }
 
     isSelected(index: number): boolean {
@@ -463,13 +488,21 @@ export class GridService {
         }
     }
 
-    private rebuildIndexMapping(processedRows: Row[]): void {
-        const originalRows = this.getRows();
-        const newMapping = new Map<number, number>();
+    private createIdentityMapping(length: number): Map<number, number> {
+        return new Map(Array.from({ length }, (_, i) => [i, i] as [number, number]));
+    }
 
+    private rebuildIndexMapping(processedRows: Row[]): void {
+        // Row object → first original index (O(n) instead of indexOf per row)
+        const originalIndexByRow = new Map<Row, number>();
+        this.getRows().forEach((row, index) => {
+            if (!originalIndexByRow.has(row)) originalIndexByRow.set(row, index);
+        });
+
+        const newMapping = new Map<number, number>();
         processedRows.forEach((processedRow, newIdx) => {
-            const originalIdx = originalRows.indexOf(processedRow);
-            if (originalIdx !== -1) {
+            const originalIdx = originalIndexByRow.get(processedRow);
+            if (originalIdx !== undefined) {
                 newMapping.set(newIdx, originalIdx);
             }
         });
@@ -477,22 +510,36 @@ export class GridService {
         this.indexMapping = newMapping;
     }
 
+    private isPureApiMode(): boolean {
+        return this.apiMode && !this.clientSideFilter && !this.clientSideSort;
+    }
+
+    /** Rows of the current view; updates the index mapping view position → original index. */
+    private resolveViewRows(): Row[] {
+        const rowsOfInterest = this.getRowsOfInterest();
+
+        if (this.isPureApiMode()) {
+            this.indexMapping = this.createIdentityMapping(rowsOfInterest.length);
+        } else if (this.apiMode) {
+            // client-side operations in API mode
+            this.rebuildIndexMapping(rowsOfInterest);
+        }
+
+        return rowsOfInterest;
+    }
+
+    /** Original row indexes of all rows in the current view, in view order. */
+    private getViewOriginalIndexes(): number[] {
+        return this.resolveViewRows().map((_, i) => this.indexMapping.get(i) ?? i);
+    }
+
     updateRenderedRows() {
         if (!this.container) return;
 
         const scrollTop = this.getScrollHeight() ?? 0;
 
-        // Get the appropriate rows based on mode and settings
-        const rowsOfInterest = this.getRowsOfInterest();
-
-        // Rebuild index mapping ONLY if client-side operations were applied in API mode
-        if (this.apiMode && (this.clientSideFilter || this.clientSideSort)) {
-            this.rebuildIndexMapping(rowsOfInterest);
-        } else if (this.apiMode && !this.clientSideFilter && !this.clientSideSort) {
-            // Pure API mode - ensure 1:1 mapping
-            const rows = this.getRows();
-            this.indexMapping = new Map([...Array(rows.length).keys()].map(i => [i, i]));
-        }
+        // Get the appropriate rows based on mode and settings (also updates the index mapping)
+        const rowsOfInterest = this.resolveViewRows();
 
         this.rowHeightService.recalculateHeights();
 
@@ -518,7 +565,7 @@ export class GridService {
             const currentIndex = this.startIndex + index;
 
             // In pure API mode (no client-side operations), use currentIndex directly
-            const originalIndex = (this.apiMode && !this.clientSideFilter && !this.clientSideSort)
+            const originalIndex = this.isPureApiMode()
                 ? currentIndex
                 : this.indexMapping.get(currentIndex) ?? currentIndex;
 

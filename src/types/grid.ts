@@ -1,5 +1,5 @@
 import type { FilterNode } from '@open-dcp/filter';
-import type { SortingCondition } from './sorting';
+import type { SortingCondition } from './sorting.js';
 
 export type ColumnType = 'string' | 'integer' | 'number' | 'date' | 'datetime' | 'duration' | 'custom' | 'component' | 'enum';
 export type GlobalSearchMode = 'value' | 'raw' | 'display';

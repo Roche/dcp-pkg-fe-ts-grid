@@ -1,5 +1,5 @@
-export { GridService } from './GridService';
-export {
+export { GridService } from './GridService.js';
+export type {
 	GridState,
 	Row,
 	RenderRow,
@@ -12,6 +12,6 @@ export {
 	GlobalSearchOptions,
 	GlobalSearchState,
 	FilterSortUpdatePayload,
-} from './types/grid';
-export { SortingCondition } from './types/sorting';
-export { FilterCondition, OperatorType, FilterGroup, FilterNode } from '@open-dcp/filter';
+} from './types/grid.js';
+export type { SortingCondition } from './types/sorting.js';
+export type { FilterCondition, OperatorType, FilterGroup, FilterNode } from '@open-dcp/filter';

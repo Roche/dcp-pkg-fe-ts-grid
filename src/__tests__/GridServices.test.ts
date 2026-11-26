@@ -1,5 +1,5 @@
-import { GridService } from '../GridService';
-import { Column, Row } from '../types/grid';
+import { GridService } from '../GridService.js';
+import { Column, Row } from '../types/grid.js';
 
 describe('GridService', () => {
     let gridService: GridService;

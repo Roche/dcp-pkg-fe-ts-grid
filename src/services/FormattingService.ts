@@ -1,5 +1,5 @@
-import type { GridService } from "../GridService";
-import { Column, DisplayValue, Row } from "../types/grid";
+import type { GridService } from "../GridService.js";
+import { Column, DisplayValue, Row } from "../types/grid.js";
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { logger } from "@open-dcp/utilities";

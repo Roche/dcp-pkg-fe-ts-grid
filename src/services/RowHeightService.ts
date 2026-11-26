@@ -1,4 +1,4 @@
-import type { GridService } from "../GridService";
+import type { GridService } from "../GridService.js";
 
 export class RowHeightService {
     private rowHeights: Map<number, number> = new Map();
